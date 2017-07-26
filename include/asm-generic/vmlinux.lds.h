@@ -60,6 +60,22 @@
 #define ALIGN_FUNCTION()  . = ALIGN(8)
 
 /*
+ * LD_DEAD_CODE_DATA_ELIMINATION option enables -fdata-sections, which
+ * generates .data.identifier sections, which need to be pulled in with
+ * .data. We don't want to pull in .data..other sections, which Linux
+ * has defined. Same for text and bss.
+ */
+#ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
+#define TEXT_MAIN .text .text.[0-9a-zA-Z_]*
+#define DATA_MAIN .data .data.[0-9a-zA-Z_]*
+#define BSS_MAIN .bss .bss.[0-9a-zA-Z_]*
+#else
+#define TEXT_MAIN .text
+#define DATA_MAIN .data
+#define BSS_MAIN .bss
+#endif
+
+/*
  * Align to a 32 byte boundary equal to the
  * alignment gcc 4.5 uses for a struct
  */
@@ -196,9 +212,11 @@
 	KEEP(*(.dtb.init.rodata))					\
 	VMLINUX_SYMBOL(__dtb_end) = .;
 
-/* .data section */
+/*
+ * .data section
+ */
 #define DATA_DATA							\
-	*(.data)							\
+	*(DATA_MAIN)							\
 	*(.ref.data)							\
 	*(.data..shared_aligned) /* percpu related */			\
 	MEM_KEEP(init.data)						\
@@ -426,14 +444,17 @@
 		VMLINUX_SYMBOL(__security_initcall_end) = .;		\
 	}
 
-/* .text section. Map to function alignment to avoid address changes
- * during second ld run in second ld pass when generating System.map */
+/*
+ * .text section. Map to function alignment to avoid address changes
+ * during second ld run in second ld pass when generating System.map
+ *
+ * TEXT_MAIN here will match .text.fixup and .text.unlikely if dead
+ * code elimination is enabled, so these sections should be converted
+ * to use ".." first.
+ */
 #define TEXT_TEXT							\
 		ALIGN_FUNCTION();					\
-		*(.text.hot .text.hot.*)				\
-		*(.text .text.fixup)					\
-		*(.text.unlikely .text.unlikely.*)			\
-		*(.text.unknown .text.unknown.*)			\
+		*(.text.hot TEXT_MAIN .text.fixup .text.unlikely)	\
 		*(.ref.text)						\
 		*(.text.asan.* .text.tsan.*)				\
 	MEM_KEEP(init.text)						\
@@ -587,7 +608,7 @@
 		BSS_FIRST_SECTIONS					\
 		*(.bss..page_aligned)					\
 		*(.dynbss)						\
-		*(.bss)							\
+		*(BSS_MAIN)						\
 		*(COMMON)						\
 	}
 
