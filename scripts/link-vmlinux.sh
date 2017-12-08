@@ -37,12 +37,109 @@ info()
 	fi
 }
 
+<<<<<<< HEAD
+=======
+# Thin archive build here makes a final archive with symbol table and indexes
+# from vmlinux objects INIT and MAIN, which can be used as input to linker.
+# KBUILD_VMLINUX_LIBS archives should already have symbol table and indexes
+# added.
+#
+# Traditional incremental style of link does not require this step
+#
+# built-in.o output file
+#
+archive_builtin()
+{
+	if [ -n "${CONFIG_THIN_ARCHIVES}" ]; then
+		info AR built-in.o
+		rm -f built-in.o;
+		${AR} rcsTP${KBUILD_ARFLAGS} built-in.o			\
+					${KBUILD_VMLINUX_INIT}		\
+					${KBUILD_VMLINUX_MAIN}
+
+		if [ -n "${CONFIG_LTO_CLANG}" ]; then
+			mv -f built-in.o built-in.o.tmp
+			${LLVM_AR} rcsT${KBUILD_ARFLAGS} built-in.o $(${AR} t built-in.o.tmp)
+			rm -f built-in.o.tmp
+		fi
+	fi
+}
+
+# If CONFIG_LTO_CLANG is selected, generate a linker script to ensure correct
+# ordering of initcalls, and with CONFIG_MODVERSIONS also enabled, collect the
+# previously generated symbol versions into the same script.
+lto_lds()
+{
+	if [ -z "${CONFIG_LTO_CLANG}" ]; then
+		return
+	fi
+
+	${srctree}/scripts/generate_initcall_order.pl \
+		built-in.o ${KBUILD_VMLINUX_LIBS} \
+		> .tmp_lto.lds
+
+	if [ -n "${CONFIG_MODVERSIONS}" ]; then
+		for a in built-in.o ${KBUILD_VMLINUX_LIBS}; do
+			for o in $(${AR} t $a); do
+				if [ -f ${o}.symversions ]; then
+					cat ${o}.symversions >> .tmp_lto.lds
+				fi
+			done
+		done
+	fi
+
+	echo "-T .tmp_lto.lds"
+}
+
+>>>>>>> dd0ccd2f948f... ANDROID: init: ensure initcall ordering with LTO
 # Link of vmlinux.o used for section mismatch analysis
 # ${1} output file
 modpost_link()
 {
+<<<<<<< HEAD
 	${LD} ${LDFLAGS} -r -o ${1} ${KBUILD_VMLINUX_INIT}                   \
 		--start-group ${KBUILD_VMLINUX_MAIN} --end-group
+=======
+	local objects
+
+	if [ -n "${CONFIG_THIN_ARCHIVES}" ]; then
+		objects="--whole-archive				\
+			built-in.o					\
+			--no-whole-archive				\
+			--start-group					\
+			${KBUILD_VMLINUX_LIBS}				\
+			--end-group"
+	else
+		objects="${KBUILD_VMLINUX_INIT}				\
+			--start-group					\
+			${KBUILD_VMLINUX_MAIN}				\
+			${KBUILD_VMLINUX_LIBS}				\
+			--end-group"
+	fi
+
+	if [ -n "${CONFIG_LTO_CLANG}" ]; then
+		# This might take a while, so indicate that we're doing
+		# an LTO link
+		info LTO vmlinux.o
+	else
+		info LD vmlinux.o
+	fi
+
+	${LD} ${LDFLAGS} -r -o ${1} $(lto_lds) ${objects}
+}
+
+# If CONFIG_LTO_CLANG is selected, we postpone running recordmcount until
+# we have compiled LLVM IR to an object file.
+recordmcount()
+{
+	if [ -z "${CONFIG_LTO_CLANG}" ]; then
+		return
+	fi
+
+	if [ -n "${CONFIG_FTRACE_MCOUNT_RECORD}" ]; then
+		scripts/recordmcount ${RECORDMCOUNT_FLAGS} $*
+	fi
+>>>>>>> dd0ccd2f948f... ANDROID: init: ensure initcall ordering with LTO
 }
 
 # Link of vmlinux
@@ -117,6 +214,10 @@ cleanup()
 	rm -f .tmp_System.map
 	rm -f .tmp_kallsyms*
 	rm -f .tmp_version
+<<<<<<< HEAD
+=======
+	rm -f .tmp_lto.lds
+>>>>>>> dd0ccd2f948f... ANDROID: init: ensure initcall ordering with LTO
 	rm -f .tmp_vmlinux*
 	rm -f System.map
 	rm -f vmlinux
