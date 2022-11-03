@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-=======
 /* Copyright (c) 2002,2007-2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
->>>>>>> 4ad6c9ec28e7e091fe7fb8f68d84f86be1a6d076
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
